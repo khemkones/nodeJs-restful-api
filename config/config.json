@@ -1,0 +1,18 @@
+{
+  "development": {
+    "username": "{username}",
+    "password": "{password}",
+    "database": "{database}",
+    "host": "{host}",
+    "dialect": "mysql",
+    "timezone": "+07:00"
+  },
+  "production": {
+    "username": "{username}",
+    "password": "{password}",
+    "database": "{database}",
+    "host": "{host}",
+    "dialect": "mysql",
+    "timezone": "+07:00"
+  }
+}
