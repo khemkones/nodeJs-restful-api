@@ -42,7 +42,9 @@ app.use(async (req, res, next) => {
 const users = require("./routes/users");
 
 
-
+app.get("/log", function (req, res) {
+  res.status(200).json("log");
+});
 
 
 // เรียกใช้งาน Index router
