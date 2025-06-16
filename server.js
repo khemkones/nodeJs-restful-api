@@ -39,6 +39,7 @@ app.use(async (req, res, next) => {
 });
 
 // Import routes
+const auth = require("./routes/auth");
 const users = require("./routes/users");
 
 
@@ -53,6 +54,7 @@ app.get("/", function (req, res) {
 });
 
 app.use("/", [
+  auth,
   users
 ]);
 

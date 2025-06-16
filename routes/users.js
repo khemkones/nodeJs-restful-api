@@ -1,107 +1,78 @@
 const express = require('express')
 const router = express.Router()
-const bcrypt = require('bcrypt');
-const http = require('../config/http');
-const controllers = require('../controllers/index');
-const authorization = require('../config/authorize'); // ตัวเช็ค Token
+const userRepo = require('../repositories/users');
+const authorization = require('../middlewares/authorize'); // ตัวเช็ค Token
 
 
 router.route('/users')
-    .post(authorization, async (req, res, next) => {
+    .get(authorization, async (req, res, next) => {
         try {
-            const user = await controllers.users.GetByUsername(req.body.username);
-            if(user){
-                http.response(res, 404, false, 'Username is duplicate')
-                return
-            }else{
-                const saltRounds = 12;
-                bcrypt.genSalt(saltRounds, function (err, salt) {
-                    if (salt) {
-                        bcrypt.hash(req.body.password, salt).then(async function (hash) {
-                            if (hash) {
-                                req.body.password = hash
-                                req.body.created_at = new Date()
-                                const Creating = await controllers.users.Insert(req.body)
-                                if (Creating) {
-                                    http.response(res, 201, true, 'Created successful');
-                                } else {
-                                    http.response(res, 400, false, 'Bad request, unable to created data');
-                                }
-                            } else {
-                                http.response(res, 404, false, 'Server error, unable encryption password')
-                            }
-                        });
-                    } else {
-                        http.response(res, 404, false, 'Server error, unable gen salt password')
-                    }
-                })
-            }
+            const { filter, offset, limit } = req.query
+            const results = await userRepo.find({ filter, offset, limit });
+            res.status(200).json(results)
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
-    .get(authorization ,async (req, res, next) => {
-        try {
-            const result = await controllers.users.List();
-            if (result) {
-                http.response(res, 200, true, 'Get successful', result)
-            } else {
-                http.response(res, 400, false, 'Bad request, unable to query data')
-            }
-        } catch (e) {
-            console.log(e);
-            http.response(res, 500, false, 'Internal server error')
-        }
-    })
-    
+
 router.route('/user/:id')
-    .put(authorization ,async (req, res, next) => {
+    .put(authorization, async (req, res, next) => {
         try {
-            const ID = req.params.id
-            if(req.body.password){
-                delete req.body.password
-            }
-            const result = await controllers.users.Update(req.body, ID);
-            if (result.affectedRows > 0) {
-                http.response(res, 200, true, 'Update successful')
-            } else {
-                http.response(res, 204, false, 'No Content, no data in entity')
-            }
+            const user_id = req.params.id
+            const result = await userRepo.fineOne({ user_id });
+            if (!result) return res.status(404).json({ message: 'User not found' });
+
+            const { first_name, last_name } = req.body
+            await userRepo.update({ first_name, last_name }, user_id);
+            res.status(200).json({ message: 'User updated successfully' });
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
     .get(authorization, async (req, res, next) => {
         try {
-            const ID = req.params.id
-            const result = await controllers.users.GetByID(ID);
-            if (result) {
-                delete result.password
-                http.response(res, 200, true, 'Get successful', result)
-            } else {
-                http.response(res, 204, false, 'No Content, no data in entity')
-            }
+            const user_id = req.params.id
+            const result = await userRepo.fineOne({ user_id });
+            if (!result) return res.status(404).json({ message: 'User not found' });
+            res.status(200).json(result)
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
     .delete(authorization, async (req, res, next) => {
         try {
-            const ID = req.params.id
-            const result = await controllers.users.Delete(ID);
-            if (result.affectedRows > 0) {
-                http.response(res, 200, true, 'Deleted successful')
-            } else {
-                http.response(res, 400, false, 'Bad request, unable to query deleted')
-            }
+            const user_id = req.params.id
+            const result = await userRepo.fineOne({ user_id });
+            if (!result) return res.status(404).json({ message: 'User not found' });
+
+            const resultDelete = await userRepo.softDelete(user_id);
+            if (resultDelete > 0) return res.status(200).json({ message: 'User deleted successfully' });
+            res.status(204).send();
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
+
+router.route('/user/hardDelete/:id')
+    .delete(authorization, async (req, res, next) => {
+        try {
+            const user_id = req.params.id
+            const result = await userRepo.fineOne({ user_id });
+            if (!result) return res.status(404).json({ message: 'User not found' });
+
+            const resultDelete = await userRepo.hardDelete(user_id);
+            if (resultDelete > 0) return res.status(200).json({ message: 'User hard deleted successfully' });
+            res.status(204).send();
+        } catch (e) {
+            console.log(e);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+    )
 
 
 

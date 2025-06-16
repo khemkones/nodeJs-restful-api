@@ -1,12 +1,11 @@
 module.exports = (sequelize, DataTypes) => {
     let Users = sequelize.define('Users', {
-      // uuid: {
-      //   type: DataTypes.UUID,
-      //   primaryKey: true,
-      //   defaultValue: sequelize.fn("uuid"),
-      //   field: "ID",
-      // },
-      // *ถ้าต้องการ id แบบ integer ไม่ต้องใส่ code ด้านบนมา
+      user_id: {
+        type: DataTypes.STRING(50),
+        primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
+      },
       createdAt: {
         type: 'TIMESTAMP',
         allowNull: false,
@@ -30,6 +29,14 @@ module.exports = (sequelize, DataTypes) => {
       password: {
         type: DataTypes.TEXT,
         allowNull: false,
+      },
+      first_name: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+      },
+      last_name: {
+        type: DataTypes.STRING(50),
+        allowNull: true
       },
     },  { tableName: 'Users'});
     return Users;

@@ -2,43 +2,55 @@ const express = require('express')
 const router = express.Router()
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken') // ใช้งาน jwt module
-const http = require('../config/http');
-const controllers = require('../controllers/index');
+const { uuidv7 } = require("uuidv7");
+require('dotenv').config()
+const AUTH_SECRET_KEY = process.env.AUTH_SECRET_KEY;
+const userRepo = require('../repositories/users');
+
 
 
 router.route('/user/signup')
     .post(async (req, res, next) => {
         try {
-            const user = await controllers.users.GetByUsername(req.body.username);
-            if(user){
-                http.response(res, 404, false, 'Username is duplicate')
-                return
-            }else{
+            const { username, password, fist_name, last_name } = req.body
+            const user = await userRepo.fineOne({ username })
+            if (user) {
+                return res.status(400).json({ message: 'Username already exists' });
+            } else {
                 const saltRounds = 12;
+                const account_id = uuidv7();
+
                 bcrypt.genSalt(saltRounds, function (err, salt) {
                     if (salt) {
-                        bcrypt.hash(req.body.password, salt).then(async function (hash) {
+                        bcrypt.hash(`${account_id}${password}`, salt).then(async function (hash) {
                             if (hash) {
-                                req.body.password = hash
-                                req.body.created_at = new Date()
-                                const Creating = await controllers.users.Insert(req.body)
-                                if (Creating) {
-                                    http.response(res, 201, true, 'Sign-Up successful');
-                                } else {
-                                    http.response(res, 400, false, 'Bad request, unable to created data');
-                                }
+                                const Creating = await userRepo.create({
+                                    account_id,
+                                    username,
+                                    password: hash,
+                                    fist_name,
+                                    last_name
+                                })
+                                res.status(201).json({
+                                    message: 'Sign-up successfully',
+                                    user: {
+                                        id: Creating.id,
+                                        username: Creating.username,
+                                        account_id: Creating.account_id
+                                    }
+                                });
                             } else {
-                                http.response(res, 404, false, 'Server error, unable encryption password')
+                                res.status(500).json({ message: 'Server error, unable to hash password' });
                             }
                         });
                     } else {
-                        http.response(res, 404, false, 'Server error, unable gen salt password')
+                        res.status(500).json({ message: 'Server error, unable to generate salt' });
                     }
                 })
             }
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
 
@@ -46,31 +58,39 @@ router.route('/user/signup')
 router.route('/user/signin')
     .post(async (req, res, next) => {
         try {
-            const result = await controllers.users.GetByUsername(req.body.username);
-            if (result) {
-                bcrypt.compare(req.body.password, result.password).then(async function (match) {
+            const { username, password } = req.body
+            const User = await userRepo.fineOne({ username })
+            if (User) {
+                bcrypt.compare(`${User.user_id}${password}`, User.password).then(async function (match) {
                     if (match) {
-                        const privateKey = fs.readFileSync(__dirname + '/../config/private.key')
-                        var AccessToken = jwt.sign({
-                            "Sub": "{{ชื่อ Token}}", // ตั้งชื่อ Token
-                            "ID": result.id, // ข้อมูลที่จะนำไปใส่ใน token แนะนำเป็น ID ของ user
-                        }, privateKey, { expiresIn: '1h' }); // ตั้งเวลา token
-                        var token = {
+                        const access_token = jwt.sign({
+                            sub: "api_testing", // ตั้งชื่อ Token
+                            id: User.user_id, // ข้อมูลที่จะนำไปใส่ใน token แนะนำเป็น ID ของ user
+                        }, AUTH_SECRET_KEY, { expiresIn: '1h' }); // ตั้งเวลา token
+                        const token = {
                             token_type: 'Bearer',
-                            access_token: AccessToken
+                            access_token,
                         }
-                        delete result.password
-                        http.response(res, 200, true, 'Sign-in successful', result, token);
+                        delete access_token.password
+                        res.status(200).json({
+                            message: 'Sign-in successfully',
+                            user: {
+                                id: User.user_id,
+                                username: User.username,
+                                account_id: User.account_id
+                            },
+                            token
+                        });
                     } else {
-                        http.response(res, 404, false, 'Password is incorrect');
+                        res.status(401).json({ message: 'Password is incorrect' });
                     }
                 });
             } else {
-                http.response(res, 404, false, 'This account is not administrator')
+                res.status(404).json({ message: 'Username not found' });
             }
         } catch (e) {
             console.log(e);
-            http.response(res, 500, false, 'Internal server error')
+            res.status(500).json({ message: 'Internal server error' });
         }
     })
 
